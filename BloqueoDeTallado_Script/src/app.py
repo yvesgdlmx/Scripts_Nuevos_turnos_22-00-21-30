@@ -33,12 +33,14 @@ def extract_date(field_name, extracted_hour):
     """
     Extrae la fecha a partir del nombre del campo.
     Se asume que el campo contiene un guion '-' y que la segunda parte corresponde al día.
-    Valida también que el día extraído no exceda el máximo permitido para el mes; en tal caso,
+    Valida además que el día extraído no exceda el máximo permitido para el mes; en tal caso,
     se ajusta el mes y/o se usa el último día válido.
     
-    Modificación aplicada: Si la hora extraída es exactamente "22:00" no se suma un día;
-    si la hora es mayor (por ejemplo, 22:30, 23:00, etc.) se suma un día.
-    Además, si la hora es "23:30" se resta un día de manera especial.
+    Modificación aplicada:
+      - Si la hora extraída es exactamente "22:00", no se suma un día.
+      - Para cualquier otra hora nocturna (como "22:30" o "23:00") no se suma un día (a diferencia de la versión anterior),
+        permitiendo que la validación en is_valid_time_for_processing funcione correctamente.
+      - Además, si la hora es "23:30" se resta un día de manera especial.
     """
     parts = field_name.split('-')
     if len(parts) >= 2:
@@ -57,15 +59,11 @@ def extract_date(field_name, extracted_hour):
             if day > max_day:
                 day = max_day
         hour, minute = map(int, extracted_hour.split(':'))
-        # Si la hora es mayor a 22 (por ejemplo, 22:30, 23:00, etc.), se suma un día.
-        if hour > 22 and hour < 24:
-            extracted_date = datetime(current_year, current_month, day) + timedelta(days=1)
+        # Se establece la fecha de base sin incorporar ningún ajuste por la hora nocturna.
+        if now.hour < 4 and day > now.day:
+            extracted_date = datetime(current_year, current_month, day) - timedelta(days=1)
         else:
-            # Si son pocas horas en la mañana y el día extraído es mayor al actual, se resta un día.
-            if now.hour < 4 and day > now.day:
-                extracted_date = datetime(current_year, current_month, day) - timedelta(days=1)
-            else:
-                extracted_date = datetime(current_year, current_month, day)
+            extracted_date = datetime(current_year, current_month, day)
         # Ajuste especial: si la hora extraída es "23:30", se resta un día adicional.
         if extracted_hour == "23:30":
             extracted_date -= timedelta(days=1)
@@ -91,7 +89,7 @@ def clean_percentage(value):
 
 def get_existing_hits(cursor, name, fecha, hour):
     """
-    Consulta en la base de datos si existe ya el registro según el name, fecha y hora.
+    Consulta en la base de datos si existe ya el registro según el name, fecha y hour.
     """
     query = """
     SELECT hits FROM bloqueo_de_tallados WHERE name = %s AND fecha = %s AND hour = %s
@@ -115,12 +113,10 @@ def is_valid_time_for_processing(extracted_hour, extracted_date):
         extracted_datetime = datetime.strptime(f"{extracted_date} {extracted_hour}", "%Y-%m-%d %H:%M")
     except ValueError:
         return False
-
     # Excepción para registros con hora "23:00": se aceptan a partir de las 23:50.
     if extracted_hour == "23:00":
         if now.time() >= datetime.strptime("23:50", "%H:%M").time():
             return True
-
     limit_time = now - timedelta(hours=1)
     return extracted_datetime <= limit_time
 
@@ -129,7 +125,7 @@ def procesar_archivo(input_file):
     data = []
     try:
         connection = mysql.connector.connect(
-            host='autorack.proxy.rlwy.net',
+           	host='autorack.proxy.rlwy.net',
             port=22723,
             user='root',
             password='zsulNCCrYFSfBqIxwwIXIKqLQKFJWwbw',
