@@ -133,7 +133,7 @@ def procesar_archivo(input_file):
                         new_row.append(clean_value(row[1]))      # Mean (columna 1)
                         new_row.append(clean_value(row[2]))      # Median (columna 2)
                         new_row.append(current_hits)             # Hits (ya ajustado)
-                        new_row.append(clean_percentage(row[4])) # Multi (columna 4)
+                        new_row.append(0) # Multi
                         new_row.append(clean_value(row[inf_fails_index]))  # INF Fails (columna 5)
                         new_row.append(clean_value(row[6]))      # Shortest (columna 6)
                         new_row.append(clean_value(row[7]))      # Longest (columna 7)

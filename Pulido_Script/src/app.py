@@ -140,7 +140,7 @@ def procesar_archivo(input_file):
                         row[2] = clean_value(row[2])      # mean
                         row[3] = clean_value(row[3])      # median
                         row[4] = current_hits             # hits
-                        row[5] = clean_percentage(row[5]) # multi
+                        row[5] = 0 # multi
                         row[6] = clean_value(row[6])      # inf fails
                         row[7] = clean_value(row[7])      # shortest
                         row[8] = clean_value(row[8])      # longest
