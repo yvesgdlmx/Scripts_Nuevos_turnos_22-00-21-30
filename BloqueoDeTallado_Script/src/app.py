@@ -17,6 +17,8 @@ def extract_hour(field_name):
         if hour >= 22 or hour < 6:
             if minute >= 30:
                 hour += 1
+            if hour == 24:
+                return "00:00"
             return f"{hour:02d}:00"
         else:
             return f"{hour:02d}:{minute:02d}"
@@ -35,7 +37,7 @@ def extract_date(field_name, extracted_hour):
     Se asume que el campo contiene un guion '-' y que la segunda parte corresponde al día.
     Valida además que el día extraído no exceda el máximo permitido para el mes; en tal caso,
     se ajusta el mes y/o se usa el último día válido.
-    
+
     Modificación aplicada:
       - Si la hora extraída es exactamente "22:00", no se suma un día.
       - Para cualquier otra hora nocturna (como "22:30" o "23:00") no se suma un día (a diferencia de la versión anterior),
@@ -67,6 +69,8 @@ def extract_date(field_name, extracted_hour):
         # Ajuste especial: si la hora extraída es "23:30", se resta un día adicional.
         if extracted_hour == "23:30":
             extracted_date -= timedelta(days=1)
+        if re.search(r"\b24:00\b", field_name):
+            extracted_date += timedelta(days=1)
         return extracted_date.strftime("%Y-%m-%d")
     return None
 
@@ -117,7 +121,7 @@ def is_valid_time_for_processing(extracted_hour, extracted_date):
     if extracted_hour == "23:00":
         if now.time() >= datetime.strptime("23:50", "%H:%M").time():
             return True
-    limit_time = now - timedelta(hours=1)
+    limit_time = now
     return extracted_datetime <= limit_time
 
 def procesar_archivo(input_file):
@@ -154,7 +158,7 @@ def procesar_archivo(input_file):
                     # - Para el archivo nocturno (contiene "NVO" en el path) se procesan solo los registros de 22:00 a 06:00.
                     # - Para el archivo diurno se procesan solo los registros de 06:30 a 21:30.
                     if "NVO" in input_file:
-                        if not (total_minutes >= 1320 or total_minutes <= 300):
+                        if not (total_minutes >= 1320 or total_minutes <= 360):
                             continue  # Registro fuera del rango del turno nocturno.
                     else:
                         if not (total_minutes >= 390 and total_minutes <= 1290):

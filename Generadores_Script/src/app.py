@@ -14,6 +14,8 @@ def extract_hour(field_name):
         if hour >= 22 and hour > 22:  # esta condición se podría ampliar según la necesidad
             if minute >= 30:
                 hour += 1
+            if hour == 24:
+                return "00:00"
             return f"{hour:02d}:00"
         else:
             return f"{hour:02d}:{minute:02d}"
@@ -43,7 +45,7 @@ def extract_date(field_name, extracted_hour):
             if day > max_day:
                 day = max_day
         hour, minute = map(int, extracted_hour.split(':'))
-        # Modificación: no se suma un día para "22:00". 
+        # Modificación: no se suma un día para "22:00".
         # Se sigue la lógica del segundo script:
         if now.hour < 4 and day > now.day:
             extracted_date = datetime(current_year, current_month, day) - timedelta(days=1)
@@ -52,6 +54,8 @@ def extract_date(field_name, extracted_hour):
         # Ajuste especial: si la hora es "23:30" se resta un día.
         if extracted_hour == "23:30":
             extracted_date -= timedelta(days=1)
+        if re.search(r"\b24:00\b", field_name):
+            extracted_date += timedelta(days=1)
         return extracted_date.strftime("%Y-%m-%d")
     return None
 
@@ -91,7 +95,7 @@ def is_valid_time_for_processing(extracted_hour, extracted_date):
         if now.time() >= datetime.strptime("23:50", "%H:%M").time():
             return True
 
-    limit_time = now - timedelta(hours=1)
+    limit_time = now
     return extracted_datetime <= limit_time
 
 def procesar_archivo(input_file):
@@ -128,7 +132,7 @@ def procesar_archivo(input_file):
                     # Filtrado de registros según el archivo:
                     if "NVO" in input_file:
                         # Para el archivo NVO: insertar registros entre 22:00 (1320 min) y 06:00 (300 min).
-                        if not (total_minutes >= 1320 or total_minutes <= 300):
+                        if not (total_minutes >= 1320 or total_minutes <= 360):
                             continue
                     else:
                         # Para el otro archivo: insertar registros entre 06:30 (390 min) y 21:30 (1290 min).

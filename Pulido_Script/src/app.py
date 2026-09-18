@@ -7,6 +7,8 @@ import mysql.connector
 def extract_hour(field_name):
     hour_match = re.search(r"(\d{1,2}):(\d{2})", field_name)
     if hour_match:
+        if hour_match.group(1) == "24" and hour_match.group(2) == "00":
+            return "00:00"
         return f"{hour_match.group(1)}:{hour_match.group(2)}"
     return ""
 
@@ -29,6 +31,8 @@ def extract_date(field_name, extracted_hour):
         # Si la hora extraída es "23:30", se resta un día adicional.
         if extracted_hour == "23:30":
             extracted_date -= timedelta(days=1)
+        if re.search(r"\b24:00\b", field_name):
+            extracted_date += timedelta(days=1)
         return extracted_date.strftime("%Y-%m-%d")
     return None
 
@@ -57,7 +61,7 @@ def delete_existing_record(cursor, name, fecha, hour):
     """
     cursor.execute(query, (name, fecha, hour))
 
-# Valida que la fecha/hora extraídas sean anteriores a (ahora – 1 hora)
+# Valida que la fecha/hora extraídas no sean posteriores a la hora actual.
 def is_valid_time_for_processing(extracted_hour, extracted_date):
     now = datetime.now()
     try:
@@ -65,12 +69,7 @@ def is_valid_time_for_processing(extracted_hour, extracted_date):
     except ValueError:
         return False
 
-    # Excepción para registros con hora "23:00": se aceptan a partir de las 23:50.
-    if extracted_hour == "23:00":
-        if now.time() >= datetime.strptime("23:50", "%H:%M").time():
-            return True
-
-    limit_time = now - timedelta(hours=1)
+    limit_time = now
     return extracted_datetime <= limit_time
 
 # Función principal para procesar el archivo
@@ -79,7 +78,7 @@ def procesar_archivo(input_file):
     data = []
     try:
         connection = mysql.connector.connect(
-           host='autorack.proxy.rlwy.net',
+            host='autorack.proxy.rlwy.net',
             port=22723,
             user='root',
             password='zsulNCCrYFSfBqIxwwIXIKqLQKFJWwbw',
@@ -98,19 +97,19 @@ def procesar_archivo(input_file):
                 if start_processing and row and row[0].strip():
                     name_field = row[0]
                     extracted_hour = extract_hour(name_field)
-                    
+
                     # Convertir la hora extraída a minutos totales para filtrar según el turno
                     try:
                         h, m = map(int, extracted_hour.split(':'))
                     except ValueError:
                         continue
                     total_minutes = h * 60 + m
-                    
+
                     # Filtrado de registros: si el archivo contiene "NVO", es turno nocturno;
                     # de lo contrario, se entiende que es diurno.
                     if "NVO" in input_file:
                         # Turno nocturno: aceptamos registros con hora entre 22:00 (1320 min) y 06:00 (360 min)
-                        if not (total_minutes >= 1320 or total_minutes <= 300):
+                        if not (total_minutes >= 1320 or total_minutes <= 360):
                             continue
                     else:
                         # Turno diurno: aceptamos registros con hora entre 06:30 (390 min) y 21:30 (1290 min)

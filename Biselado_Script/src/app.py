@@ -5,6 +5,8 @@ import mysql.connector
 def extract_hour(field_name):
     hour_match = re.search(r"(\d{1,2}):(\d{2})", field_name)
     if hour_match:
+        if hour_match.group(1) == "24" and hour_match.group(2) == "00":
+            return "00:00"
         return f"{hour_match.group(1)}:{hour_match.group(2)}"
     return ""
 def extract_num(field_name):
@@ -25,6 +27,8 @@ def extract_date(field_name, extracted_hour):
         # Si la hora extraída es "23:30", se ajusta restando un día adicional
         if extracted_hour == "23:30":
             extracted_date -= timedelta(days=1)
+        if re.search(r"\b24:00\b", field_name):
+            extracted_date += timedelta(days=1)
         return extracted_date.strftime("%Y-%m-%d")
     return None
 def clean_value(value):
@@ -57,7 +61,7 @@ def is_valid_time_for_processing(extracted_hour, extracted_date):
     if extracted_hour == "23:00":
         if now.time() >= datetime.strptime("23:50", "%H:%M").time():
             return True
-    limit_time = now - timedelta(hours=1)
+    limit_time = now
     return extracted_datetime <= limit_time
 def procesar_archivo(input_file):
     start_processing = False
@@ -93,7 +97,7 @@ def procesar_archivo(input_file):
                     total_minutes = h * 60 + m
                     if "NVO" in input_file:
                         # Turno nocturno: se aceptan registros entre 22:00 (1320 min) y 06:00 (360 min)
-                        if not (total_minutes >= 1320 or total_minutes <= 300):
+                        if not (total_minutes >= 1320 or total_minutes <= 360):
                             continue
                     else:
                         # Turno diurno: se aceptan registros entre 06:30 (390 min) y 21:30 (1290 min)
@@ -105,7 +109,7 @@ def procesar_archivo(input_file):
                     extracted_num = extract_num(name_field)
                     print(f"Procesando fila: {row}")
                     print(f"Hits extraídos (original): {row[hits_index]}")
-                    
+
                     try:
                         current_hits = int(row[hits_index])
                     except ValueError:
